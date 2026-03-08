@@ -9,8 +9,8 @@ import gradio as gr
 
 def load_voices() -> Tuple[List[str], Dict[str, str]]:
     voices = asyncio.run(edge_tts.list_voices())
-    voice_map = {}
-    labels = []
+    voice_map: Dict[str, str] = {}
+    labels: List[str] = []
 
     for v in voices:
         label = f"{v['ShortName']} | {v['Locale']} | {v['Gender']}"
@@ -61,7 +61,19 @@ def run_generate_tts(text, voice_label, speed, pitch):
 
 
 with gr.Blocks(title="Edge TTS UI") as demo:
-    gr.Markdown("# Edge TTS UI")
+    gr.Markdown(
+        """
+# Edge TTS UI
+
+Features:
+- Text input
+- Voice selection
+- Speed control
+- Pitch control
+- MP3 preview
+- MP3 download
+        """
+    )
 
     with gr.Row():
         with gr.Column():
@@ -93,7 +105,7 @@ with gr.Blocks(title="Edge TTS UI") as demo:
                 label="Pitch (Hz)"
             )
 
-            generate_btn = gr.Button("Generate Voice")
+            generate_btn = gr.Button("Generate Voice", variant="primary")
 
         with gr.Column():
             audio_output = gr.Audio(label="Preview", type="filepath")
@@ -105,6 +117,7 @@ with gr.Blocks(title="Edge TTS UI") as demo:
         inputs=[text_input, voice_dropdown, speed_slider, pitch_slider],
         outputs=[audio_output, file_output, status_output],
     )
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
