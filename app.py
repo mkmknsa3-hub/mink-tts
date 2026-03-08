@@ -52,7 +52,6 @@ async def generate_tts(text: str, voice_label: str, speed: int, pitch: int):
         )
         await communicate.save(mp3_path)
         return mp3_path, mp3_path, "Done. MP3 generated successfully."
-
     except Exception as e:
         return None, None, f"Error: {str(e)}"
 
@@ -62,16 +61,7 @@ def run_generate_tts(text, voice_label, speed, pitch):
 
 
 with gr.Blocks(title="Edge TTS UI") as demo:
-    gr.Markdown(
-        """
-# Edge TTS UI
-Text to Speech with:
-- Voice select
-- Speed option
-- Pitch option
-- MP3 output
-        """
-    )
+    gr.Markdown("# Edge TTS UI")
 
     with gr.Row():
         with gr.Column():
@@ -103,7 +93,7 @@ Text to Speech with:
                 label="Pitch (Hz)"
             )
 
-            generate_btn = gr.Button("Generate Voice", variant="primary")
+            generate_btn = gr.Button("Generate Voice")
 
         with gr.Column():
             audio_output = gr.Audio(label="Preview", type="filepath")
@@ -112,15 +102,10 @@ Text to Speech with:
 
     generate_btn.click(
         fn=run_generate_tts,
-        inputs=[
-            text_input,
-            voice_dropdown,
-            speed_slider,
-            pitch_slider,
-        ],
+        inputs=[text_input, voice_dropdown, speed_slider, pitch_slider],
         outputs=[audio_output, file_output, status_output],
     )
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 8080))
     demo.launch(server_name="0.0.0.0", server_port=port)
