@@ -1,70 +1,102 @@
-import gradio as gr
 import asyncio
-import edge_tts
 import os
+import tempfile
 
-# မြန်မာအသံ (၂) မျိုးတည်းကိုသာ ရွေးချယ်ခွင့်ပေးခြင်း
-VOICES = {
-    "မြန်မာ (အမျိုးသမီး) - Nilar": "my-MM-NilarNeural",
-    "မြန်မာ (အမျိုးသား) - Thiha": "my-MM-ThihaNeural"
+import edge_tts
+import gradio as gr
+
+# Myanmar voices only
+MYANMAR_VOICES = {
+    "Myanmar Female - Nilar": "my-MM-NilarNeural",
+    "Myanmar Male - Thiha": "my-MM-ThihaNeural",
 }
 
-async def generate_voice(text, voice_name, rate, pitch):
-    if not text.strip():
-        return None
-        
-    voice_id = VOICES[voice_name]
-    
-    # Format speed and pitch for edge-tts
-    rate_str = f"{rate:+d}%"
-    pitch_str = f"{pitch:+d}Hz"
-    
-    output_file = "output_voice.mp3"
-    
-    try:
-        # Latest edge-tts communication
-        communicate = edge_tts.Communicate(text, voice_id, rate=rate_str, pitch=pitch_str)
-        await communicate.save(output_file)
-        return output_file
-    except Exception as e:
-        print(f"Detailed Error: {str(e)}")
-        raise gr.Error(f"အသံထုတ်လုပ်ရာတွင် အမှားအယွင်းရှိနေပါသည်: {str(e)}")
+VOICE_LABELS = list(MYANMAR_VOICES.keys())
+DEFAULT_VOICE = "Myanmar Female - Nilar"
 
-# Gradio UI - Version 4.x အသစ်ဆုံးပုံစံ
-with gr.Blocks(theme=gr.themes.Soft()) as demo:
-    gr.Markdown("## 🇲🇲 Myanmar Male/Female TTS (Railway Optimized)")
-    
+
+async def generate_tts(text: str, voice_label: str, speed: int, pitch: int):
+    if not text or not text.strip():
+        return None, None, "စာရိုက်ထည့်ပါ။"
+
+    voice = MYANMAR_VOICES[voice_label]
+    rate = f"{speed:+d}%"
+    pitch_value = f"{pitch:+d}Hz"
+
+    temp_dir = tempfile.mkdtemp()
+    mp3_path = os.path.join(temp_dir, "output.mp3")
+
+    try:
+        communicate = edge_tts.Communicate(
+            text=text,
+            voice=voice,
+            rate=rate,
+            pitch=pitch_value,
+        )
+        await communicate.save(mp3_path)
+        return mp3_path, mp3_path, "ပြီးပါပြီ။ MP3 ထုတ်ပြီးပါပြီ။"
+
+    except Exception as e:
+        msg = str(e)
+        if "403" in msg:
+            return None, None, (
+                "403 error ဖြစ်နေပါတယ်။ edge-tts endpoint က request ကိုပိတ်ထားတာပါ။ "
+                "requirements.txt မှာ edge-tts==7.2.7 သုံးထားတာသေချာစစ်ပါ။ "
+                "အဲဒါပြီးလည်း 403 ဆက်ဖြစ်ရင် Railway IP/region ဘက်က block ဖြစ်နိုင်ပါတယ်။"
+            )
+        return None, None, f"Error: {msg}"
+
+
+def run_generate_tts(text, voice_label, speed, pitch):
+    return asyncio.run(generate_tts(text, voice_label, speed, pitch))
+
+
+with gr.Blocks(title="Myanmar TTS") as demo:
+    gr.Markdown("## Myanmar TTS\nMyanmar Female / Male ပဲပြထားပါတယ်။")
+
     with gr.Row():
         with gr.Column():
-            input_text = gr.Textbox(
-                label="စာသားထည့်ပါ", 
-                lines=5, 
-                placeholder="ဒီမှာ စာရိုက်ပါ..."
+            text_input = gr.Textbox(
+                label="စာထည့်ရန်",
+                lines=8,
+                placeholder="မင်္ဂလာပါ။ ဒီဟာက မြန်မာအသံ စမ်းသပ်ခြင်း ဖြစ်ပါတယ်။",
             )
-            
-            # မြန်မာ ၂ မျိုးတည်းသာ ပြသရန်
-            voice_opt = gr.Dropdown(
-                choices=list(VOICES.keys()), 
-                label="အသံရွေးချယ်ပါ", 
-                value="မြန်မာ (အမျိုးသမီး) - Nilar"
-            )
-            
-            with gr.Row():
-                rate_slider = gr.Slider(minimum=-50, maximum=50, value=0, label="အမြန်နှုန်း (Speed %)")
-                pitch_slider = gr.Slider(minimum=-50, maximum=50, value=0, label="အသံနေအထား (Pitch Hz)")
-            
-            btn = gr.Button("အသံထုတ်မည်", variant="primary")
-            
-        with gr.Column():
-            audio_output = gr.Audio(label="ရလဒ် အသံဖိုင်", type="filepath")
 
-    btn.click(
-        fn=generate_voice, 
-        inputs=[input_text, voice_opt, rate_slider, pitch_slider], 
-        outputs=audio_output
+            voice_dropdown = gr.Dropdown(
+                choices=VOICE_LABELS,
+                value=DEFAULT_VOICE,
+                label="အသံရွေးရန်",
+            )
+
+            speed_slider = gr.Slider(
+                minimum=-50,
+                maximum=50,
+                value=0,
+                step=1,
+                label="အမြန်နှုန်း (%)",
+            )
+
+            pitch_slider = gr.Slider(
+                minimum=-50,
+                maximum=50,
+                value=0,
+                step=1,
+                label="Pitch (Hz)",
+            )
+
+            generate_btn = gr.Button("Generate Voice", variant="primary")
+
+        with gr.Column():
+            audio_output = gr.Audio(label="Preview", type="filepath")
+            file_output = gr.File(label="Download MP3")
+            status_output = gr.Textbox(label="Status", interactive=False)
+
+    generate_btn.click(
+        fn=run_generate_tts,
+        inputs=[text_input, voice_dropdown, speed_slider, pitch_slider],
+        outputs=[audio_output, file_output, status_output],
     )
 
 if __name__ == "__main__":
-    # Railway PORT configuration
-    port = int(os.environ.get("PORT", 7860))
+    port = int(os.environ.get("PORT", 8080))
     demo.launch(server_name="0.0.0.0", server_port=port)
