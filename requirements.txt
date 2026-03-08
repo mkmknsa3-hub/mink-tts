@@ -1,0 +1,5 @@
+
+edge-tts
+# The Gradio version pinned to ensure consistent behaviour during deployment
+gradio>=4.19.2
+pydub
